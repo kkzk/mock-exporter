@@ -13,6 +13,12 @@ custom_gauge = Gauge('custom_metric_value', 'Custom metric value from web interf
 # webhookメッセージを保存するリスト（実際のプロダクションではデータベースを使用）
 webhook_messages = []
 
+# 現在のメトリクス値を保存（複数ブラウザ間での同期用）
+current_metrics = {
+    'metric_name': 'custom_application_metric',
+    'metric_value': 50
+}
+
 def index(request):
     """メイン画面を表示"""
     return render(request, 'metrics_app/index.html')
@@ -30,8 +36,24 @@ def update_metric(request):
             metric_name = data.get('metric_name', 'default_metric')
             metric_value = float(data.get('metric_value', 0))
             
+            # グローバルな現在値を更新
+            current_metrics['metric_name'] = metric_name
+            current_metrics['metric_value'] = metric_value
+            
             # メトリクス値を更新
             custom_gauge.set(metric_value)
+            
+            # WebSocketで他のクライアントに通知
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "metrics_sync",
+                {
+                    "type": "metric_sync",
+                    "metric_name": metric_name,
+                    "metric_value": metric_value,
+                    "sender_channel": None  # サーバーからの更新
+                }
+            )
             
             return JsonResponse({'status': 'success', 'value': metric_value})
         except Exception as e:
@@ -92,4 +114,12 @@ def get_webhook_messages(request):
     return JsonResponse({
         'status': 'success',
         'messages': webhook_messages[-20:]  # 最新20件を返す
+    })
+
+def get_current_metrics(request):
+    """現在のメトリクス値を取得するAPI"""
+    return JsonResponse({
+        'status': 'success',
+        'metric_name': current_metrics['metric_name'],
+        'metric_value': current_metrics['metric_value']
     })

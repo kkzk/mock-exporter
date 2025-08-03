@@ -72,15 +72,40 @@
             statusDiv.style.display = 'block';
         }
         
+        // スライダー値変更の防止フラグ（WebSocketからの更新時に無限ループを防ぐ）
+        let isUpdatingFromWebSocket = false;
+        
         slider.addEventListener('input', function() {
-            display.textContent = this.value;
-            // スライダーの値が変更されたときに自動的にメトリクスを更新
-            updateMetricAuto();
+            if (!isUpdatingFromWebSocket) {
+                display.textContent = this.value;
+                // スライダーの値が変更されたときに自動的にメトリクスを更新
+                updateMetricAuto();
+                
+                // WebSocketで他のクライアントに通知
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({
+                        type: 'metric_update',
+                        metric_name: metricNameInput.value,
+                        metric_value: this.value
+                    }));
+                }
+            }
         });
         
         metricNameInput.addEventListener('input', function() {
-            // メトリクス名が変更されたときに自動的にメトリクスを更新
-            updateMetricAuto();
+            if (!isUpdatingFromWebSocket) {
+                // メトリクス名が変更されたときに自動的にメトリクスを更新
+                updateMetricAuto();
+                
+                // WebSocketで他のクライアントに通知
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({
+                        type: 'metric_update',
+                        metric_name: this.value,
+                        metric_value: slider.value
+                    }));
+                }
+            }
         });
         
         function updateMetricAuto() {
@@ -139,10 +164,41 @@
         
         // ページ読み込み時に初期値でメトリクスを設定
         window.addEventListener('load', function() {
-            updateMetricAuto();
+            loadCurrentMetrics();  // 最初に現在の値を読み込み
             loadMessages();
             connectWebSocket();
         });
+
+        // 現在のメトリクス値を読み込む
+        function loadCurrentMetrics() {
+            fetch('/get_current_metrics/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        isUpdatingFromWebSocket = true;
+                        
+                        const metricNameInput = document.getElementById('metric_name');
+                        const slider = document.getElementById('metric_value');
+                        const display = document.getElementById('value_display');
+                        
+                        metricNameInput.value = data.metric_name;
+                        slider.value = data.metric_value;
+                        display.textContent = data.metric_value;
+                        
+                        // メトリクスをPrometheusに設定
+                        updateMetricAuto();
+                        
+                        setTimeout(() => {
+                            isUpdatingFromWebSocket = false;
+                        }, 100);
+                    }
+                })
+                .catch(error => {
+                    console.error('現在のメトリクス値の取得に失敗:', error);
+                    // エラーの場合はデフォルト値でメトリクスを設定
+                    updateMetricAuto();
+                });
+        }
 
         // WebSocket接続
         let websocket = null;
@@ -172,6 +228,25 @@
                     const data = JSON.parse(event.data);
                     if (data.type === 'webhook_message') {
                         addNewMessage(data.message);
+                    } else if (data.type === 'metric_sync') {
+                        // 他のクライアントからのメトリクス同期
+                        isUpdatingFromWebSocket = true;
+                        
+                        // スライダーとメトリクス名を更新
+                        const metricNameInput = document.getElementById('metric_name');
+                        const slider = document.getElementById('metric_value');
+                        const display = document.getElementById('value_display');
+                        
+                        metricNameInput.value = data.metric_name;
+                        slider.value = data.metric_value;
+                        display.textContent = data.metric_value;
+                        
+                        // フラグをリセット
+                        setTimeout(() => {
+                            isUpdatingFromWebSocket = false;
+                        }, 100);
+                        
+                        console.log(`メトリクス同期: ${data.metric_name} = ${data.metric_value}`);
                     }
                 };
                 

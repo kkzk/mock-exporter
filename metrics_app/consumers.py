@@ -8,6 +8,11 @@ class WebhookConsumer(AsyncWebsocketConsumer):
             "webhook_messages",
             self.channel_name
         )
+        # WebSocketクライアントをmetrics_syncグループに追加（スライダー同期用）
+        await self.channel_layer.group_add(
+            "metrics_sync",
+            self.channel_name
+        )
         await self.accept()
 
     async def disconnect(self, close_code):
@@ -16,12 +21,37 @@ class WebhookConsumer(AsyncWebsocketConsumer):
             "webhook_messages",
             self.channel_name
         )
+        # WebSocketクライアントをmetrics_syncグループから削除
+        await self.channel_layer.group_discard(
+            "metrics_sync",
+            self.channel_name
+        )
 
     async def receive(self, text_data):
-        # クライアントからのメッセージを受信（今回は特に処理しない）
-        pass
+        # クライアントからのメッセージを受信
+        try:
+            text_data_json = json.loads(text_data)
+            message_type = text_data_json.get('type')
+            
+            if message_type == 'metric_update':
+                # スライダー値の更新をグループの他のクライアントに送信
+                metric_name = text_data_json.get('metric_name')
+                metric_value = text_data_json.get('metric_value')
+                
+                await self.channel_layer.group_send(
+                    "metrics_sync",
+                    {
+                        "type": "metric_sync",
+                        "metric_name": metric_name,
+                        "metric_value": metric_value,
+                        "sender_channel": self.channel_name
+                    }
+                )
+        except json.JSONDecodeError:
+            # 無効なJSONの場合は無視
+            pass
 
-    # グループからのメッセージを受信してクライアントに送信
+    # グループからのwebhookメッセージを受信してクライアントに送信
     async def webhook_message(self, event):
         message = event['message']
         
@@ -30,3 +60,13 @@ class WebhookConsumer(AsyncWebsocketConsumer):
             'type': 'webhook_message',
             'message': message
         }))
+
+    # グループからのメトリクス同期メッセージを受信してクライアントに送信
+    async def metric_sync(self, event):
+        # 送信者と同じクライアントには送信しない
+        if event.get('sender_channel') != self.channel_name:
+            await self.send(text_data=json.dumps({
+                'type': 'metric_sync',
+                'metric_name': event['metric_name'],
+                'metric_value': event['metric_value']
+            }))
