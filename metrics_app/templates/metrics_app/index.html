@@ -13,6 +13,9 @@
         .value-display { font-weight: bold; margin-left: 10px; }
         button { padding: 10px 20px; background: #007cba; color: white; border: none; cursor: pointer; }
         button:hover { background: #005a87; }
+        .status { margin-top: 10px; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
@@ -31,6 +34,8 @@
     
     <button onclick="updateMetric()">メトリクス更新</button>
     
+    <div id="status" class="status" style="display: none;"></div>
+    
     <div style="margin-top: 30px;">
         <p><strong>Prometheusエンドポイント:</strong> <a href="/metrics" target="_blank">/metrics</a></p>
     </div>
@@ -38,10 +43,52 @@
     <script>
         const slider = document.getElementById('metric_value');
         const display = document.getElementById('value_display');
+        const statusDiv = document.getElementById('status');
+        const metricNameInput = document.getElementById('metric_name');
+        
+        function showStatus(message, isSuccess = true) {
+            statusDiv.textContent = message;
+            statusDiv.className = isSuccess ? 'status success' : 'status error';
+            statusDiv.style.display = 'block';
+        }
         
         slider.addEventListener('input', function() {
             display.textContent = this.value;
+            // スライダーの値が変更されたときに自動的にメトリクスを更新
+            updateMetricAuto();
         });
+        
+        metricNameInput.addEventListener('input', function() {
+            // メトリクス名が変更されたときに自動的にメトリクスを更新
+            updateMetricAuto();
+        });
+        
+        function updateMetricAuto() {
+            const metricName = document.getElementById('metric_name').value;
+            const metricValue = document.getElementById('metric_value').value;
+            
+            fetch('/update_metric/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    metric_name: metricName,
+                    metric_value: metricValue
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showStatus(`メトリクス "${metricName}" を ${data.value} に自動更新しました`, true);
+                } else {
+                    showStatus('エラー: ' + data.message, false);
+                }
+            })
+            .catch(error => {
+                showStatus('エラーが発生しました: ' + error, false);
+            });
+        }
         
         function updateMetric() {
             const metricName = document.getElementById('metric_name').value;
@@ -60,15 +107,20 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert(`メトリクス "${metricName}" を ${data.value} に更新しました`);
+                    showStatus(`メトリクス "${metricName}" を ${data.value} に手動更新しました`, true);
                 } else {
-                    alert('エラー: ' + data.message);
+                    showStatus('エラー: ' + data.message, false);
                 }
             })
             .catch(error => {
-                alert('エラーが発生しました: ' + error);
+                showStatus('エラーが発生しました: ' + error, false);
             });
         }
+        
+        // ページ読み込み時に初期値でメトリクスを設定
+        window.addEventListener('load', function() {
+            updateMetricAuto();
+        });
     </script>
 </body>
 </html>
