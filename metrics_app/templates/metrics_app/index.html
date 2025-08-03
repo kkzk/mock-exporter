@@ -225,21 +225,26 @@
                 }, 500);
             });
             
-            // スライダー変更イベント
+            // スライダー値の表示更新（リアルタイム）
             slider.addEventListener('input', function() {
                 if (isUpdating) return;
                 
-                // 現在のメトリクスとして選択
-                selectMetricRow(metricId);
+                // 行の選択状態のみ変更（APIリクエストなし）
+                selectMetricRowVisually(metricId);
                 
                 const value = parseFloat(this.value);
                 valueSpan.textContent = value;
+            });
+            
+            // スライダー変更完了時にサーバーに送信
+            slider.addEventListener('change', function() {
+                if (isUpdating) return;
                 
-                // デバウンス処理
-                clearTimeout(updateTimer);
-                updateTimer = setTimeout(() => {
-                    updateMetricValue(metricId, null, value);
-                }, 100);
+                // 正式に選択してサーバーに通知
+                selectMetricRow(metricId);
+                
+                const value = parseFloat(this.value);
+                updateMetricValue(metricId, null, value);
             });
             
             // 行クリックで選択
@@ -250,21 +255,26 @@
             });
         }
 
-        function selectMetricRow(metricId) {
+        function selectMetricRowVisually(metricId) {
             // 全ての行から選択状態を削除
             document.querySelectorAll('.metric-row').forEach(row => {
                 row.classList.remove('selected');
             });
             
-            // 指定されたメトリクスの行を選択
+            // 指定されたメトリクスの行を選択（視覚的のみ）
             const targetRow = document.querySelector(`[data-metric-id="${metricId}"]`);
             if (targetRow) {
                 targetRow.classList.add('selected');
                 currentMetricId = metricId;
-                
-                // サーバーに現在選択中のメトリクスを通知
-                selectMetric(metricId);
             }
+        }
+
+        function selectMetricRow(metricId) {
+            // 視覚的な選択を実行
+            selectMetricRowVisually(metricId);
+            
+            // サーバーに現在選択中のメトリクスを通知
+            selectMetric(metricId);
         }
 
         async function updateMetricValue(metricId, metricName, metricValue) {
