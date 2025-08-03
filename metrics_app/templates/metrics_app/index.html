@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metrics Dashboard</title>
     {% load static %}
-    <link rel="stylesheet" type="text/css" href="{% static 'metrics_app/css/style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'metrics_app/css/style.css' %}?v=20250803">
 </head>
 <body>
-    <h1>Metrics Dashboard</h1>
-    
-    <div id="connectionStatus" class="connection-status disconnected">
-        WebSocket接続を確立中...
+    <div class="header-container">
+        <h1>Metrics Dashboard</h1>
+        <div id="connectionStatus" class="connection-status disconnected">
+            WebSocket接続を確立中...
+        </div>
     </div>
 
     <div class="container">
@@ -36,6 +37,6 @@
         </div>
     </div>
 
-    <script src="{% static 'metrics_app/js/dashboard.js' %}"></script>
+    <script src="{% static 'metrics_app/js/dashboard.js' %}?v=20250803"></script>
 </body>
 </html>
