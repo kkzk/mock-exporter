@@ -68,8 +68,8 @@ CHANNEL_LAYERS = {
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+# 開発環境では各アプリの static フォルダを自動的に検索するため
+# STATICFILES_DIRS は不要（警告を回避）
+# STATICFILES_DIRS = []
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

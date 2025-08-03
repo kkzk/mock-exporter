@@ -99,12 +99,11 @@ function addWebhookMessage(message) {
         messageElement.innerHTML = `<strong>[${timestamp}]</strong> ${formattedMessage}`;
     }
     
-    messagesDiv.appendChild(messageElement);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesDiv.insertBefore(messageElement, messagesDiv.firstChild);
     
     // 古いメッセージが多くなりすぎないように制限
     if (messagesDiv.children.length > 50) {
-        messagesDiv.removeChild(messagesDiv.firstChild);
+        messagesDiv.removeChild(messagesDiv.lastChild);
     }
 }
 
