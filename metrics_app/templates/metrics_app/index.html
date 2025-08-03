@@ -23,37 +23,72 @@
             color: #333;
             margin-bottom: 20px;
         }
-        .metric-control {
+        .controls-row {
             margin-bottom: 20px;
-            padding: 15px;
+        }
+        .metrics-container {
             border: 1px solid #ddd;
             border-radius: 5px;
+            min-height: 200px;
+        }
+        .metric-row {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
             background-color: #fafafa;
+            transition: background-color 0.2s;
+        }
+        .metric-row:hover {
+            background-color: #f0f0f0;
+        }
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+        .metric-row.selected {
+            background-color: #e7f3ff;
+            border-left: 4px solid #007bff;
+        }
+        .metric-name-section {
+            flex: 0 0 250px;
+            margin-right: 15px;
         }
         .metric-name-input {
-            width: 200px;
+            width: 100%;
             padding: 8px;
-            margin-right: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
+            font-size: 14px;
+        }
+        .prometheus-name {
+            font-size: 0.8em;
+            color: #666;
+            font-style: italic;
+            margin-top: 4px;
+            word-break: break-all;
+        }
+        .metric-value-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
         }
         .metric-slider {
-            width: 300px;
-            margin: 10px 0;
+            flex: 1;
+            margin-right: 10px;
         }
         .metric-value {
             font-weight: bold;
             color: #007bff;
-            margin-left: 10px;
+            min-width: 40px;
+            text-align: right;
         }
-        .prometheus-name {
-            font-size: 0.9em;
-            color: #666;
-            font-style: italic;
+        .metric-actions {
+            flex: 0 0 auto;
         }
         .button {
             padding: 8px 15px;
-            margin: 5px;
+            margin: 2px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -75,30 +110,18 @@
             background-color: #ffc107;
             color: black;
         }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
         .button:hover {
             opacity: 0.8;
         }
-        .metrics-list {
-            margin-bottom: 20px;
-        }
-        .metric-item {
-            padding: 10px;
-            margin: 5px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: white;
-            cursor: pointer;
-        }
-        .metric-item.selected {
-            border-color: #007bff;
-            background-color: #e7f3ff;
-        }
-        .metric-item:hover {
-            background-color: #f0f0f0;
-        }
-        .current-metric {
-            border: 2px solid #007bff;
-            background-color: #e7f3ff;
+        .no-metrics-message {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
         }
         .webhook-messages {
             max-height: 200px;
@@ -140,36 +163,16 @@
 
     <div class="container">
         <h2>メトリクス管理</h2>
-        <div>
+        <div class="controls-row">
             <button class="button btn-success" onclick="createNewMetric()">新しいメトリクス作成</button>
             <button class="button btn-warning" onclick="clearAllMetrics()">全メトリクス削除</button>
         </div>
         
-        <div class="metrics-list">
-            <h3>メトリクス一覧</h3>
+        <div class="metrics-container">
             <div id="metricsList"></div>
-        </div>
-    </div>
-
-    <div class="container">
-        <h2>現在のメトリクス</h2>
-        <div id="currentMetricControl" class="metric-control" style="display: none;">
-            <div>
-                <label>メトリクス名: </label>
-                <input type="text" id="metricNameInput" class="metric-name-input" placeholder="メトリクス名を入力">
-                <span class="prometheus-name">Prometheus名: <span id="prometheusName">-</span></span>
+            <div id="noMetricMessage" class="no-metrics-message" style="display: none;">
+                メトリクスがありません。「新しいメトリクス作成」ボタンでメトリクスを追加してください。
             </div>
-            <div>
-                <label>値: </label>
-                <input type="range" id="metricSlider" class="metric-slider" min="0" max="100" value="0">
-                <span class="metric-value" id="metricValue">0</span>
-            </div>
-            <div>
-                <button class="button btn-danger" onclick="deleteCurrentMetric()">このメトリクスを削除</button>
-            </div>
-        </div>
-        <div id="noMetricMessage" style="color: #666; font-style: italic;">
-            メトリクスが選択されていません。新しいメトリクスを作成するか、既存のメトリクスを選択してください。
         </div>
     </div>
 
@@ -252,7 +255,6 @@
                 if (data.status === 'success') {
                     currentMetricId = data.current_metric_id;
                     displayMetricsList(data.metrics);
-                    updateCurrentMetricDisplay();
                 }
             } catch (error) {
                 console.error('メトリクス一覧の読み込みエラー:', error);
@@ -261,29 +263,149 @@
 
         function displayMetricsList(metrics) {
             const listDiv = document.getElementById('metricsList');
+            const noMetricMessage = document.getElementById('noMetricMessage');
+            
             listDiv.innerHTML = '';
             
             if (metrics.length === 0) {
-                listDiv.innerHTML = '<p style="color: #666; font-style: italic;">メトリクスがありません</p>';
+                noMetricMessage.style.display = 'block';
                 return;
             }
             
+            noMetricMessage.style.display = 'none';
+            
             metrics.forEach(metric => {
-                const item = document.createElement('div');
-                item.className = 'metric-item';
+                const row = document.createElement('div');
+                row.className = 'metric-row';
+                row.dataset.metricId = metric.metric_id;
+                
                 if (metric.metric_id === currentMetricId) {
-                    item.classList.add('selected');
+                    row.classList.add('selected');
                 }
                 
-                item.innerHTML = `
-                    <strong>${metric.original_name}</strong>
-                    <br><small>Prometheus名: ${metric.prometheus_name}</small>
-                    <br><small>値: ${metric.value}</small>
+                row.innerHTML = `
+                    <div class="metric-name-section">
+                        <input type="text" class="metric-name-input" value="${metric.original_name}" 
+                               data-metric-id="${metric.metric_id}" placeholder="メトリクス名を入力">
+                        <div class="prometheus-name">Prometheus名: ${metric.prometheus_name}</div>
+                    </div>
+                    <div class="metric-value-section">
+                        <input type="range" class="metric-slider" min="0" max="100" value="${metric.value}"
+                               data-metric-id="${metric.metric_id}">
+                        <span class="metric-value">${metric.value}</span>
+                    </div>
+                    <div class="metric-actions">
+                        <button class="button btn-danger btn-small" onclick="deleteMetric(${metric.metric_id})">削除</button>
+                    </div>
                 `;
                 
-                item.onclick = () => selectMetric(metric.metric_id);
-                listDiv.appendChild(item);
+                listDiv.appendChild(row);
+                
+                // イベントリスナーを追加
+                setupMetricRowEvents(row, metric.metric_id);
             });
+        }
+
+        function setupMetricRowEvents(row, metricId) {
+            const nameInput = row.querySelector('.metric-name-input');
+            const slider = row.querySelector('.metric-slider');
+            const valueSpan = row.querySelector('.metric-value');
+            
+            let updateTimer = null;
+            
+            // メトリクス名入力イベント
+            nameInput.addEventListener('input', function() {
+                if (isUpdating) return;
+                
+                // 現在のメトリクスとして選択
+                selectMetricRow(metricId);
+                
+                // デバウンス処理
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateMetricValue(metricId, this.value, null);
+                }, 500);
+            });
+            
+            // スライダー変更イベント
+            slider.addEventListener('input', function() {
+                if (isUpdating) return;
+                
+                // 現在のメトリクスとして選択
+                selectMetricRow(metricId);
+                
+                const value = parseFloat(this.value);
+                valueSpan.textContent = value;
+                
+                // デバウンス処理
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateMetricValue(metricId, null, value);
+                }, 100);
+            });
+            
+            // 行クリックで選択
+            row.addEventListener('click', function(e) {
+                if (!e.target.matches('input, button')) {
+                    selectMetricRow(metricId);
+                }
+            });
+        }
+
+        function selectMetricRow(metricId) {
+            // 全ての行から選択状態を削除
+            document.querySelectorAll('.metric-row').forEach(row => {
+                row.classList.remove('selected');
+            });
+            
+            // 指定されたメトリクスの行を選択
+            const targetRow = document.querySelector(`[data-metric-id="${metricId}"]`);
+            if (targetRow) {
+                targetRow.classList.add('selected');
+                currentMetricId = metricId;
+                
+                // サーバーに現在選択中のメトリクスを通知
+                selectMetric(metricId);
+            }
+        }
+
+        async function updateMetricValue(metricId, metricName, metricValue) {
+            try {
+                const requestData = { metric_id: metricId };
+                if (metricName !== null) requestData.metric_name = metricName;
+                if (metricValue !== null) requestData.metric_value = metricValue;
+                
+                const response = await fetch('/update_metric/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // Prometheus名を更新
+                    const row = document.querySelector(`[data-metric-id="${metricId}"]`);
+                    if (row) {
+                        const prometheusNameDiv = row.querySelector('.prometheus-name');
+                        prometheusNameDiv.textContent = `Prometheus名: ${data.prometheus_name}`;
+                    }
+                    
+                    // WebSocketで他のクライアントに通知
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            type: 'metric_update',
+                            metric_id: metricId,
+                            metric_name: data.original_name,
+                            prometheus_name: data.prometheus_name,
+                            metric_value: data.value
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('メトリクス更新エラー:', error);
+            }
         }
 
         async function selectMetric(metricId) {
@@ -299,39 +421,9 @@
                 const data = await response.json();
                 if (data.status === 'success') {
                     currentMetricId = data.current_metric_id;
-                    await loadMetricsList();
-                    updateCurrentMetricDisplay();
                 }
             } catch (error) {
                 console.error('メトリクス選択エラー:', error);
-            }
-        }
-
-        function updateCurrentMetricDisplay() {
-            const currentMetricControl = document.getElementById('currentMetricControl');
-            const noMetricMessage = document.getElementById('noMetricMessage');
-            
-            if (currentMetricId) {
-                // 現在のメトリクス情報を取得して表示
-                fetch('/get_current_metrics/')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            const currentMetric = data.metrics.find(m => m.metric_id === currentMetricId);
-                            if (currentMetric) {
-                                document.getElementById('metricNameInput').value = currentMetric.original_name;
-                                document.getElementById('prometheusName').textContent = currentMetric.prometheus_name;
-                                document.getElementById('metricSlider').value = currentMetric.value;
-                                document.getElementById('metricValue').textContent = currentMetric.value;
-                                
-                                currentMetricControl.style.display = 'block';
-                                noMetricMessage.style.display = 'none';
-                            }
-                        }
-                    });
-            } else {
-                currentMetricControl.style.display = 'none';
-                noMetricMessage.style.display = 'block';
             }
         }
 
@@ -352,7 +444,6 @@
                 if (data.status === 'success') {
                     currentMetricId = data.metric_id;
                     await loadMetricsList();
-                    updateCurrentMetricDisplay();
                 } else {
                     alert('メトリクス作成エラー: ' + data.message);
                 }
@@ -362,9 +453,7 @@
             }
         }
 
-        async function deleteCurrentMetric() {
-            if (!currentMetricId) return;
-            
+        async function deleteMetric(metricId) {
             if (!confirm('このメトリクスを削除しますか？')) return;
             
             try {
@@ -373,14 +462,13 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ metric_id: currentMetricId })
+                    body: JSON.stringify({ metric_id: metricId })
                 });
                 
                 const data = await response.json();
                 if (data.status === 'success') {
                     currentMetricId = data.current_metric_id;
                     await loadMetricsList();
-                    updateCurrentMetricDisplay();
                 } else {
                     alert('メトリクス削除エラー: ' + data.message);
                 }
@@ -405,7 +493,6 @@
                 if (data.status === 'success') {
                     currentMetricId = null;
                     await loadMetricsList();
-                    updateCurrentMetricDisplay();
                 } else {
                     alert('メトリクス削除エラー: ' + data.message);
                 }
@@ -415,105 +502,22 @@
             }
         }
 
-        // メトリクス名の変更を処理
-        document.addEventListener('DOMContentLoaded', function() {
-            let updateTimer = null;
-            
-            document.getElementById('metricNameInput').addEventListener('input', function() {
-                if (isUpdating || !currentMetricId) return;
-                
-                // デバウンス処理：500ms後に更新
-                clearTimeout(updateTimer);
-                updateTimer = setTimeout(() => {
-                    const metricName = this.value;
-                    updateMetric(metricName, null);
-                }, 500);
-            });
-
-            // スライダーの変更を処理
-            document.getElementById('metricSlider').addEventListener('input', function() {
-                if (isUpdating || !currentMetricId) return;
-                
-                const metricValue = parseFloat(this.value);
-                document.getElementById('metricValue').textContent = metricValue;
-                
-                // デバウンス処理：100ms後に更新
-                clearTimeout(updateTimer);
-                updateTimer = setTimeout(() => {
-                    updateMetric(null, metricValue);
-                }, 100);
-            });
-        });
-
-        async function updateMetric(metricName, metricValue) {
-            if (!currentMetricId) return;
-            
-            try {
-                const requestData = { metric_id: currentMetricId };
-                if (metricName !== null) requestData.metric_name = metricName;
-                if (metricValue !== null) requestData.metric_value = metricValue;
-                
-                const response = await fetch('/update_metric/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-                
-                const data = await response.json();
-                if (data.status === 'success') {
-                    // Prometheus名を更新
-                    document.getElementById('prometheusName').textContent = data.prometheus_name;
-                    
-                    // WebSocketで他のクライアントに通知
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({
-                            type: 'metric_update',
-                            metric_id: currentMetricId,
-                            metric_name: data.original_name,
-                            prometheus_name: data.prometheus_name,
-                            metric_value: data.value
-                        }));
-                    }
-                    
-                    // メトリクス一覧を更新（デバウンス）
-                    clearTimeout(window.updateListTimer);
-                    window.updateListTimer = setTimeout(() => {
-                        loadMetricsList();
-                    }, 200);
-                }
-            } catch (error) {
-                console.error('メトリクス更新エラー:', error);
-            }
-        }
-
-        function updateMetricFromWebSocket(data) {
-            // WebSocketからの更新を処理（無限ループを防ぐ）
-            if (data.metric_id === currentMetricId) {
-                isUpdating = true;
-                
-                document.getElementById('metricNameInput').value = data.metric_name;
-                document.getElementById('prometheusName').textContent = data.prometheus_name;
-                document.getElementById('metricSlider').value = data.metric_value;
-                document.getElementById('metricValue').textContent = data.metric_value;
-                
-                setTimeout(() => {
-                    isUpdating = false;
-                }, 100);
-            }
-            
-            // メトリクス一覧を更新（デバウンス）
-            clearTimeout(window.updateListTimer);
-            window.updateListTimer = setTimeout(() => {
-                loadMetricsList();
-            }, 200);
-        }
-
         // ページ読み込み時の初期化
         window.addEventListener('load', function() {
             connectWebSocket();
             loadMetricsList();
+            
+            // 新しいメトリクスを作成ボタン
+            const createBtn = document.getElementById('create-metric');
+            if (createBtn) {
+                createBtn.addEventListener('click', createNewMetric);
+            }
+            
+            // 全削除ボタン
+            const clearBtn = document.getElementById('clear-all');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', clearAllMetrics);
+            }
         });
     </script>
 </body>
