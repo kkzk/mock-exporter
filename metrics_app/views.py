@@ -42,12 +42,6 @@ def create_new_metric(metric_name="new_metric"):
     prometheus_name = convert_to_prometheus_name(metric_name)
     
     try:
-        # 既存の同名メトリクスがあるかチェック
-        for existing_id, info in metrics_registry.items():
-            if info['prometheus_name'] == prometheus_name:
-                prometheus_name = f"{prometheus_name}_{metric_id}"
-                break
-        
         # 新しいメトリクスを作成
         gauge = Gauge(prometheus_name, f"Dynamic metric {metric_id} created from web interface")
         
@@ -323,13 +317,39 @@ def get_metrics_list(request):
         'current_metric_id': current_metric_id
     })
 
+def generate_unique_metric_name(base_name="new_metric"):
+    """重複しないメトリクス名を生成"""
+    prometheus_base = convert_to_prometheus_name(base_name)
+    
+    # 既存のメトリクス名を確認
+    existing_names = set()
+    for info in metrics_registry.values():
+        existing_names.add(info['prometheus_name'])
+    
+    # ベース名が使用可能かチェック
+    if prometheus_base not in existing_names:
+        return base_name
+    
+    # 連番を付けて重複しない名前を生成
+    counter = 1
+    while True:
+        candidate_name = f"{base_name}_{counter}"
+        candidate_prometheus = convert_to_prometheus_name(candidate_name)
+        if candidate_prometheus not in existing_names:
+            return candidate_name
+        counter += 1
+
 @csrf_exempt
 def create_metric(request):
     """新しいメトリクスを作成する"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            metric_name = data.get('metric_name', 'new_metric')
+            metric_name = data.get('metric_name')
+            
+            # メトリクス名が指定されていない場合は自動生成
+            if not metric_name:
+                metric_name = generate_unique_metric_name("new_metric")
             
             metric_id = create_new_metric(metric_name)
             if metric_id:

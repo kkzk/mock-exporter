@@ -284,16 +284,13 @@
         }
 
         async function createNewMetric() {
-            const metricName = prompt('新しいメトリクス名を入力してください:', 'new_metric');
-            if (!metricName) return;
-            
             try {
                 const response = await fetch('/create_metric/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ metric_name: metricName })
+                    body: JSON.stringify({})  // メトリクス名は自動生成
                 });
                 
                 const data = await response.json();
