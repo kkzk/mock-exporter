@@ -61,6 +61,9 @@
                     addWebhookMessage(data.message);
                 } else if (data.type === 'metric_sync') {
                     updateMetricFromWebSocket(data);
+                } else if (data.type === 'metrics_update') {
+                    // メトリクス一覧を再読み込み
+                    loadMetricsList();
                 }
             };
             
@@ -352,6 +355,32 @@
             } catch (error) {
                 console.error('メトリクス削除エラー:', error);
                 alert('メトリクス削除エラー');
+            }
+        }
+
+        function updateMetricFromWebSocket(data) {
+            // WebSocketからの更新を処理（無限ループを防ぐ）
+            isUpdating = true;
+            
+            try {
+                const row = document.querySelector(`[data-metric-id="${data.metric_id}"]`);
+                if (row) {
+                    const nameInput = row.querySelector('.metric-name-input');
+                    const slider = row.querySelector('.metric-slider');
+                    const valueSpan = row.querySelector('.metric-value');
+                    const prometheusNameDiv = row.querySelector('.prometheus-name');
+                    
+                    if (nameInput) nameInput.value = data.metric_name;
+                    if (slider) slider.value = data.metric_value;
+                    if (valueSpan) valueSpan.textContent = data.metric_value;
+                    if (prometheusNameDiv) prometheusNameDiv.textContent = `Prometheus名: ${data.prometheus_name}`;
+                }
+            } catch (error) {
+                console.error('WebSocket更新エラー:', error);
+            } finally {
+                setTimeout(() => {
+                    isUpdating = false;
+                }, 100);
             }
         }
 

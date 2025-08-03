@@ -76,3 +76,9 @@ class WebhookConsumer(AsyncWebsocketConsumer):
                 'prometheus_name': event.get('prometheus_name'),
                 'metric_value': event['metric_value']
             }))
+
+    # メトリクス一覧の更新通知を受信してクライアントに送信
+    async def metrics_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'metrics_update'
+        }))

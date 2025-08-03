@@ -320,6 +320,24 @@ def create_metric(request):
             
             metric_id = create_new_metric(metric_name)
             if metric_id:
+                # WebSocketで他のクライアントに通知
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    "webhook_messages",
+                    {
+                        "type": "webhook_message",
+                        "message": f"新しいメトリクス '{metric_name}' が作成されました"
+                    }
+                )
+                
+                # メトリクス一覧の更新を通知
+                async_to_sync(channel_layer.group_send)(
+                    "metrics_sync",
+                    {
+                        "type": "metrics_update"
+                    }
+                )
+                
                 return JsonResponse({
                     'status': 'success',
                     'metric_id': metric_id,
@@ -375,7 +393,29 @@ def delete_metric(request):
                 return JsonResponse({'status': 'error', 'message': 'metric_id is required'})
             
             metric_id = int(metric_id)
+            
+            # 削除前にメトリクス名を取得
+            metric_name = current_metrics.get(metric_id, {}).get('original_name', 'Unknown')
+            
             if delete_metric_by_id(metric_id):
+                # WebSocketで他のクライアントに通知
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    "webhook_messages",
+                    {
+                        "type": "webhook_message",
+                        "message": f"メトリクス '{metric_name}' が削除されました"
+                    }
+                )
+                
+                # メトリクス一覧の更新を通知
+                async_to_sync(channel_layer.group_send)(
+                    "metrics_sync",
+                    {
+                        "type": "metrics_update"
+                    }
+                )
+                
                 return JsonResponse({
                     'status': 'success',
                     'message': f'Metric deleted successfully',
@@ -395,11 +435,31 @@ def cleanup_metrics(request):
     try:
         global current_metric_id
         
+        metrics_count = len(metrics_registry)
+        
         # 全てのメトリクスを削除
         for metric_id in list(metrics_registry.keys()):
             delete_metric_by_id(metric_id)
         
         current_metric_id = None
+        
+        # WebSocketで他のクライアントに通知
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "webhook_messages",
+            {
+                "type": "webhook_message",
+                "message": f"全メトリクス ({metrics_count}個) が削除されました"
+            }
+        )
+        
+        # メトリクス一覧の更新を通知
+        async_to_sync(channel_layer.group_send)(
+            "metrics_sync",
+            {
+                "type": "metrics_update"
+            }
+        )
         
         return JsonResponse({
             'status': 'success',
