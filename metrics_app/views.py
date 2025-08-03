@@ -4,6 +4,8 @@ from django.views.decorators.csrf import csrf_exempt
 from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 import json
 from datetime import datetime
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 # Prometheusメトリクスのインスタンス
 custom_gauge = Gauge('custom_metric_value', 'Custom metric value from web interface')
@@ -63,6 +65,16 @@ def webhook(request):
             # 最新の100件のみ保持
             if len(webhook_messages) > 100:
                 webhook_messages.pop(0)
+            
+            # WebSocketでリアルタイム通知を送信
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "webhook_messages",
+                {
+                    "type": "webhook_message",
+                    "message": webhook_message
+                }
+            )
             
             return JsonResponse({
                 'status': 'success', 

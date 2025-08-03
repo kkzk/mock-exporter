@@ -21,6 +21,10 @@
         .message-content { font-family: monospace; background-color: #fff; padding: 5px; border-radius: 3px; }
         .auto-refresh-on { background-color: #28a745; }
         .auto-refresh-off { background-color: #6c757d; }
+        .websocket-status { font-size: 0.8em; margin-left: 10px; }
+        .websocket-connected { color: #28a745; }
+        .websocket-disconnected { color: #dc3545; }
+        .websocket-connecting { color: #ffc107; }
     </style>
 </head>
 <body>
@@ -47,11 +51,12 @@
     </div>
 
     <div style="margin-top: 30px;">
-        <h2>Webhook Messages</h2>
+        <h2>Webhook Messages 
+            <span id="websocket-status" class="websocket-status websocket-disconnected">● 切断中</span>
+        </h2>
         <button onclick="loadMessages()">メッセージを更新</button>
-        <button onclick="toggleAutoRefresh()">自動更新 ON/OFF</button>
         <div id="messages-container" style="margin-top: 15px; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
-            <p>メッセージがここに表示されます...</p>
+            <p>WebSocket接続中...</p>
         </div>
     </div>
 
@@ -136,12 +141,92 @@
         window.addEventListener('load', function() {
             updateMetricAuto();
             loadMessages();
+            connectWebSocket();
         });
 
-        // Webhook messages functionality
-        let autoRefreshInterval = null;
-        let autoRefreshEnabled = false;
+        // WebSocket接続
+        let websocket = null;
+        let reconnectInterval = null;
 
+        function connectWebSocket() {
+            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const wsUrl = `${wsScheme}://${window.location.host}/ws/webhook_messages/`;
+            
+            updateWebSocketStatus('connecting', '● 接続中...');
+            
+            try {
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = function(event) {
+                    console.log('WebSocket接続が開きました');
+                    updateWebSocketStatus('connected', '● 接続済み');
+                    
+                    // 再接続タイマーをクリア
+                    if (reconnectInterval) {
+                        clearInterval(reconnectInterval);
+                        reconnectInterval = null;
+                    }
+                };
+                
+                websocket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'webhook_message') {
+                        addNewMessage(data.message);
+                    }
+                };
+                
+                websocket.onclose = function(event) {
+                    console.log('WebSocket接続が閉じられました');
+                    updateWebSocketStatus('disconnected', '● 切断中');
+                    
+                    // 自動再接続を試行
+                    if (!reconnectInterval) {
+                        reconnectInterval = setInterval(function() {
+                            console.log('WebSocket再接続を試行中...');
+                            connectWebSocket();
+                        }, 5000);
+                    }
+                };
+                
+                websocket.onerror = function(error) {
+                    console.error('WebSocketエラー:', error);
+                    updateWebSocketStatus('disconnected', '● エラー');
+                };
+                
+            } catch (error) {
+                console.error('WebSocket接続エラー:', error);
+                updateWebSocketStatus('disconnected', '● 接続失敗');
+            }
+        }
+
+        function updateWebSocketStatus(status, text) {
+            const statusElement = document.getElementById('websocket-status');
+            statusElement.textContent = text;
+            statusElement.className = `websocket-status websocket-${status}`;
+        }
+
+        function addNewMessage(message) {
+            const container = document.getElementById('messages-container');
+            
+            // 新しいメッセージ要素を作成
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-item';
+            messageDiv.innerHTML = `
+                <div class="message-timestamp">${message.timestamp}</div>
+                <div class="message-content">${escapeHtml(JSON.stringify(message.message, null, 2))}</div>
+            `;
+            
+            // 一番上に挿入
+            container.insertBefore(messageDiv, container.firstChild);
+            
+            // 100件を超える場合は古いメッセージを削除
+            const messageItems = container.getElementsByClassName('message-item');
+            if (messageItems.length > 100) {
+                container.removeChild(messageItems[messageItems.length - 1]);
+            }
+        }
+
+        // Webhook messages functionality
         function loadMessages() {
             fetch('/get_webhook_messages/')
                 .then(response => response.json())
@@ -175,34 +260,12 @@
                 `;
             });
             container.innerHTML = html;
-            
-            // 最新のメッセージが見えるように一番上にスクロール
-            container.scrollTop = 0;
         }
 
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        function toggleAutoRefresh() {
-            const button = event.target;
-            
-            if (autoRefreshEnabled) {
-                // 自動更新を停止
-                clearInterval(autoRefreshInterval);
-                autoRefreshEnabled = false;
-                button.textContent = '自動更新 OFF';
-                button.className = 'auto-refresh-off';
-            } else {
-                // 自動更新を開始（5秒間隔）
-                autoRefreshInterval = setInterval(loadMessages, 5000);
-                autoRefreshEnabled = true;
-                button.textContent = '自動更新 ON';
-                button.className = 'auto-refresh-on';
-                loadMessages(); // すぐに一度実行
-            }
         }
     </script>
 </body>

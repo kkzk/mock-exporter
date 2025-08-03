@@ -5,6 +5,9 @@ description = "Django Web App with Prometheus Metrics"
 dependencies = [
     "django>=4.2",
     "prometheus-client>=0.19.0",
+    "channels>=4.0.0",
+    "channels-redis>=4.1.0",
+    "daphne>=4.2.1",
 ]
 
 [tool.uv]
