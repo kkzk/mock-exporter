@@ -255,7 +255,7 @@ def webhook(request):
                 "webhook_messages",
                 {
                     "type": "webhook_message",
-                    "message": webhook_message
+                    "message": f"[{webhook_message['timestamp']}] {webhook_message['message']}"
                 }
             )
             
