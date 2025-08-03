@@ -23,6 +23,11 @@ metric_id_counter = 0
 # 現在選択中のメトリクスID
 current_metric_id = None
 
+def initialize_default_metrics():
+    """初期メトリクスを作成"""
+    if not metrics_registry:  # まだメトリクスが作成されていない場合のみ
+        create_new_metric("custom_metric_value")
+
 def get_next_metric_id():
     """次のメトリクスIDを取得"""
     global metric_id_counter
@@ -152,6 +157,8 @@ def delete_metric_by_id(metric_id):
 
 def index(request):
     """メイン画面を表示"""
+    # 初期メトリクスを作成
+    initialize_default_metrics()
     return render(request, 'metrics_app/index.html')
 
 def metrics(request):
@@ -278,6 +285,9 @@ def get_webhook_messages(request):
 
 def get_current_metrics(request):
     """現在のメトリクス値を取得するAPI"""
+    # 初期メトリクスを作成
+    initialize_default_metrics()
+    
     metrics_data = []
     for metric_id, info in current_metrics.items():
         metrics_data.append({
@@ -295,6 +305,9 @@ def get_current_metrics(request):
 
 def get_metrics_list(request):
     """利用可能なメトリクス一覧を取得するAPI"""
+    # 初期メトリクスを作成
+    initialize_default_metrics()
+    
     metrics_list = []
     for metric_id, info in current_metrics.items():
         metrics_list.append({
