@@ -3,345 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mock Metrics Exporter</title>
+    <title>Metrics Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 50px; }
-        .form-group { margin: 20px 0; }
-        label { display: block; margin-bottom: 5px; }
-        input[type="text"] { width: 300px; padding: 5px; }
-        input[type="range"] { width: 300px; }
-        .value-display { font-weight: bold; margin-left: 10px; }
-        button { padding: 10px 20px; background: #007cba; color: white; border: none; cursor: pointer; margin-right: 10px; }
-        button:hover { background: #005a87; }
-        .status { margin-top: 10px; padding: 10px; border-radius: 4px; }
-        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message-item { margin-bottom: 10px; padding: 8px; border-left: 3px solid #007cba; background-color: #f0f8ff; }
-        .message-timestamp { font-size: 0.8em; color: #666; margin-bottom: 5px; }
-        .message-content { font-family: monospace; background-color: #fff; padding: 5px; border-radius: 3px; }
-        .auto-refresh-on { background-color: #28a745; }
-        .auto-refresh-off { background-color: #6c757d; }
-        .websocket-status { font-size: 0.8em; margin-left: 10px; }
-        .websocket-connected { color: #28a745; }
-        .websocket-disconnected { color: #dc3545; }
-        .websocket-connecting { color: #ffc107; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .metric-control {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .metric-name-input {
+            width: 200px;
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .metric-slider {
+            width: 300px;
+            margin: 10px 0;
+        }
+        .metric-value {
+            font-weight: bold;
+            color: #007bff;
+            margin-left: 10px;
+        }
+        .prometheus-name {
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
+        }
+        .button {
+            padding: 8px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .button:hover {
+            opacity: 0.8;
+        }
+        .metrics-list {
+            margin-bottom: 20px;
+        }
+        .metric-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            cursor: pointer;
+        }
+        .metric-item.selected {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        .metric-item:hover {
+            background-color: #f0f0f0;
+        }
+        .current-metric {
+            border: 2px solid #007bff;
+            background-color: #e7f3ff;
+        }
+        .webhook-messages {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+        }
+        .connection-status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
     </style>
 </head>
 <body>
-    <h1>Mock Metrics Exporter</h1>
+    <h1>Metrics Dashboard</h1>
     
-    <div class="form-group">
-        <label for="metric_name">メトリクス名:</label>
-        <input type="text" id="metric_name" value="custom_application_metric" />
-    </div>
-    
-    <div class="form-group">
-        <label for="metric_value">メトリクス値 (0-100):</label>
-        <input type="range" id="metric_value" min="0" max="100" value="50" />
-        <span class="value-display" id="value_display">50</span>
-    </div>
-    
-    <button onclick="updateMetric()">メトリクス更新</button>
-    
-    <div id="status" class="status" style="display: none;"></div>
-    
-    <div style="margin-top: 30px;">
-        <p><strong>Prometheusエンドポイント:</strong> <a href="/metrics" target="_blank">/metrics</a></p>
-        <p><strong>Webhookエンドポイント:</strong> <code>POST /webhook/</code></p>
+    <div id="connectionStatus" class="connection-status disconnected">
+        WebSocket接続を確立中...
     </div>
 
-    <div style="margin-top: 30px;">
-        <h2>Webhook Messages 
-            <span id="websocket-status" class="websocket-status websocket-disconnected">● 切断中</span>
-        </h2>
-        <button onclick="loadMessages()">メッセージを更新</button>
-        <div id="messages-container" style="margin-top: 15px; max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
-            <p>WebSocket接続中...</p>
+    <div class="container">
+        <h2>メトリクス管理</h2>
+        <div>
+            <button class="button btn-success" onclick="createNewMetric()">新しいメトリクス作成</button>
+            <button class="button btn-warning" onclick="clearAllMetrics()">全メトリクス削除</button>
+        </div>
+        
+        <div class="metrics-list">
+            <h3>メトリクス一覧</h3>
+            <div id="metricsList"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>現在のメトリクス</h2>
+        <div id="currentMetricControl" class="metric-control" style="display: none;">
+            <div>
+                <label>メトリクス名: </label>
+                <input type="text" id="metricNameInput" class="metric-name-input" placeholder="メトリクス名を入力">
+                <span class="prometheus-name">Prometheus名: <span id="prometheusName">-</span></span>
+            </div>
+            <div>
+                <label>値: </label>
+                <input type="range" id="metricSlider" class="metric-slider" min="0" max="100" value="0">
+                <span class="metric-value" id="metricValue">0</span>
+            </div>
+            <div>
+                <button class="button btn-danger" onclick="deleteCurrentMetric()">このメトリクスを削除</button>
+            </div>
+        </div>
+        <div id="noMetricMessage" style="color: #666; font-style: italic;">
+            メトリクスが選択されていません。新しいメトリクスを作成するか、既存のメトリクスを選択してください。
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Webhook メッセージ</h2>
+        <div id="webhookMessages" class="webhook-messages">
+            <p style="color: #666; font-style: italic;">メッセージがここに表示されます...</p>
         </div>
     </div>
 
     <script>
-        const slider = document.getElementById('metric_value');
-        const display = document.getElementById('value_display');
-        const statusDiv = document.getElementById('status');
-        const metricNameInput = document.getElementById('metric_name');
-        
-        function showStatus(message, isSuccess = true) {
-            statusDiv.textContent = message;
-            statusDiv.className = isSuccess ? 'status success' : 'status error';
-            statusDiv.style.display = 'block';
-        }
-        
-        // スライダー値変更の防止フラグ（WebSocketからの更新時に無限ループを防ぐ）
-        let isUpdatingFromWebSocket = false;
-        
-        slider.addEventListener('input', function() {
-            if (!isUpdatingFromWebSocket) {
-                display.textContent = this.value;
-                // スライダーの値が変更されたときに自動的にメトリクスを更新
-                updateMetricAuto();
-                
-                // WebSocketで他のクライアントに通知
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    websocket.send(JSON.stringify({
-                        type: 'metric_update',
-                        metric_name: metricNameInput.value,
-                        metric_value: this.value
-                    }));
-                }
-            }
-        });
-        
-        metricNameInput.addEventListener('input', function() {
-            if (!isUpdatingFromWebSocket) {
-                // メトリクス名が変更されたときに自動的にメトリクスを更新
-                updateMetricAuto();
-                
-                // WebSocketで他のクライアントに通知
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    websocket.send(JSON.stringify({
-                        type: 'metric_update',
-                        metric_name: this.value,
-                        metric_value: slider.value
-                    }));
-                }
-            }
-        });
-        
-        function updateMetricAuto() {
-            const metricName = document.getElementById('metric_name').value;
-            const metricValue = document.getElementById('metric_value').value;
-            
-            fetch('/update_metric/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    metric_name: metricName,
-                    metric_value: metricValue
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showStatus(`メトリクス "${metricName}" を ${data.value} に自動更新しました`, true);
-                } else {
-                    showStatus('エラー: ' + data.message, false);
-                }
-            })
-            .catch(error => {
-                showStatus('エラーが発生しました: ' + error, false);
-            });
-        }
-        
-        function updateMetric() {
-            const metricName = document.getElementById('metric_name').value;
-            const metricValue = document.getElementById('metric_value').value;
-            
-            fetch('/update_metric/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    metric_name: metricName,
-                    metric_value: metricValue
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showStatus(`メトリクス "${metricName}" を ${data.value} に手動更新しました`, true);
-                } else {
-                    showStatus('エラー: ' + data.message, false);
-                }
-            })
-            .catch(error => {
-                showStatus('エラーが発生しました: ' + error, false);
-            });
-        }
-        
-        // ページ読み込み時に初期値でメトリクスを設定
-        window.addEventListener('load', function() {
-            loadCurrentMetrics();  // 最初に現在の値を読み込み
-            loadMessages();
-            connectWebSocket();
-        });
+        let socket = null;
+        let currentMetricId = null;
+        let isUpdating = false; // WebSocketからの更新中フラグ
 
-        // 現在のメトリクス値を読み込む
-        function loadCurrentMetrics() {
-            fetch('/get_current_metrics/')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        isUpdatingFromWebSocket = true;
-                        
-                        const metricNameInput = document.getElementById('metric_name');
-                        const slider = document.getElementById('metric_value');
-                        const display = document.getElementById('value_display');
-                        
-                        metricNameInput.value = data.metric_name;
-                        slider.value = data.metric_value;
-                        display.textContent = data.metric_value;
-                        
-                        // メトリクスをPrometheusに設定
-                        updateMetricAuto();
-                        
-                        setTimeout(() => {
-                            isUpdatingFromWebSocket = false;
-                        }, 100);
-                    }
-                })
-                .catch(error => {
-                    console.error('現在のメトリクス値の取得に失敗:', error);
-                    // エラーの場合はデフォルト値でメトリクスを設定
-                    updateMetricAuto();
-                });
-        }
-
-        // WebSocket接続
-        let websocket = null;
-        let reconnectInterval = null;
-
+        // WebSocket接続を確立
         function connectWebSocket() {
-            const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            const wsUrl = `${wsScheme}://${window.location.host}/ws/webhook_messages/`;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/webhook/`;
             
-            updateWebSocketStatus('connecting', '● 接続中...');
+            socket = new WebSocket(wsUrl);
             
+            socket.onopen = function(e) {
+                console.log('WebSocket接続が確立されました');
+                updateConnectionStatus(true);
+            };
+            
+            socket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                console.log('WebSocketメッセージ受信:', data);
+                
+                if (data.type === 'webhook_message') {
+                    addWebhookMessage(data.message);
+                } else if (data.type === 'metric_sync') {
+                    updateMetricFromWebSocket(data);
+                }
+            };
+            
+            socket.onclose = function(e) {
+                console.log('WebSocket接続が閉じられました');
+                updateConnectionStatus(false);
+                // 3秒後に再接続を試行
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            socket.onerror = function(e) {
+                console.error('WebSocketエラー:', e);
+                updateConnectionStatus(false);
+            };
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (connected) {
+                statusElement.textContent = 'WebSocket接続済み';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = 'WebSocket切断中 - 再接続を試行中...';
+                statusElement.className = 'connection-status disconnected';
+            }
+        }
+
+        function addWebhookMessage(message) {
+            const messagesDiv = document.getElementById('webhookMessages');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageElement.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function loadMetricsList() {
             try {
-                websocket = new WebSocket(wsUrl);
+                const response = await fetch('/get_metrics_list/');
+                const data = await response.json();
                 
-                websocket.onopen = function(event) {
-                    console.log('WebSocket接続が開きました');
-                    updateWebSocketStatus('connected', '● 接続済み');
-                    
-                    // 再接続タイマーをクリア
-                    if (reconnectInterval) {
-                        clearInterval(reconnectInterval);
-                        reconnectInterval = null;
-                    }
-                };
-                
-                websocket.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'webhook_message') {
-                        addNewMessage(data.message);
-                    } else if (data.type === 'metric_sync') {
-                        // 他のクライアントからのメトリクス同期
-                        isUpdatingFromWebSocket = true;
-                        
-                        // スライダーとメトリクス名を更新
-                        const metricNameInput = document.getElementById('metric_name');
-                        const slider = document.getElementById('metric_value');
-                        const display = document.getElementById('value_display');
-                        
-                        metricNameInput.value = data.metric_name;
-                        slider.value = data.metric_value;
-                        display.textContent = data.metric_value;
-                        
-                        // フラグをリセット
-                        setTimeout(() => {
-                            isUpdatingFromWebSocket = false;
-                        }, 100);
-                        
-                        console.log(`メトリクス同期: ${data.metric_name} = ${data.metric_value}`);
-                    }
-                };
-                
-                websocket.onclose = function(event) {
-                    console.log('WebSocket接続が閉じられました');
-                    updateWebSocketStatus('disconnected', '● 切断中');
-                    
-                    // 自動再接続を試行
-                    if (!reconnectInterval) {
-                        reconnectInterval = setInterval(function() {
-                            console.log('WebSocket再接続を試行中...');
-                            connectWebSocket();
-                        }, 5000);
-                    }
-                };
-                
-                websocket.onerror = function(error) {
-                    console.error('WebSocketエラー:', error);
-                    updateWebSocketStatus('disconnected', '● エラー');
-                };
-                
+                if (data.status === 'success') {
+                    currentMetricId = data.current_metric_id;
+                    displayMetricsList(data.metrics);
+                    updateCurrentMetricDisplay();
+                }
             } catch (error) {
-                console.error('WebSocket接続エラー:', error);
-                updateWebSocketStatus('disconnected', '● 接続失敗');
+                console.error('メトリクス一覧の読み込みエラー:', error);
             }
         }
 
-        function updateWebSocketStatus(status, text) {
-            const statusElement = document.getElementById('websocket-status');
-            statusElement.textContent = text;
-            statusElement.className = `websocket-status websocket-${status}`;
-        }
-
-        function addNewMessage(message) {
-            const container = document.getElementById('messages-container');
+        function displayMetricsList(metrics) {
+            const listDiv = document.getElementById('metricsList');
+            listDiv.innerHTML = '';
             
-            // 新しいメッセージ要素を作成
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message-item';
-            messageDiv.innerHTML = `
-                <div class="message-timestamp">${message.timestamp}</div>
-                <div class="message-content">${escapeHtml(JSON.stringify(message.message, null, 2))}</div>
-            `;
-            
-            // 一番上に挿入
-            container.insertBefore(messageDiv, container.firstChild);
-            
-            // 100件を超える場合は古いメッセージを削除
-            const messageItems = container.getElementsByClassName('message-item');
-            if (messageItems.length > 100) {
-                container.removeChild(messageItems[messageItems.length - 1]);
-            }
-        }
-
-        // Webhook messages functionality
-        function loadMessages() {
-            fetch('/get_webhook_messages/')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        displayMessages(data.messages);
-                    } else {
-                        console.error('Failed to load messages:', data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading messages:', error);
-                });
-        }
-
-        function displayMessages(messages) {
-            const container = document.getElementById('messages-container');
-            
-            if (messages.length === 0) {
-                container.innerHTML = '<p>まだメッセージがありません。</p>';
+            if (metrics.length === 0) {
+                listDiv.innerHTML = '<p style="color: #666; font-style: italic;">メトリクスがありません</p>';
                 return;
             }
-
-            let html = '';
-            messages.reverse().forEach(msg => {
-                html += `
-                    <div class="message-item">
-                        <div class="message-timestamp">${msg.timestamp}</div>
-                        <div class="message-content">${escapeHtml(JSON.stringify(msg.message, null, 2))}</div>
-                    </div>
+            
+            metrics.forEach(metric => {
+                const item = document.createElement('div');
+                item.className = 'metric-item';
+                if (metric.metric_id === currentMetricId) {
+                    item.classList.add('selected');
+                }
+                
+                item.innerHTML = `
+                    <strong>${metric.original_name}</strong>
+                    <br><small>Prometheus名: ${metric.prometheus_name}</small>
+                    <br><small>値: ${metric.value}</small>
                 `;
+                
+                item.onclick = () => selectMetric(metric.metric_id);
+                listDiv.appendChild(item);
             });
-            container.innerHTML = html;
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        async function selectMetric(metricId) {
+            try {
+                const response = await fetch('/select_metric/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ metric_id: metricId })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentMetricId = data.current_metric_id;
+                    await loadMetricsList();
+                    updateCurrentMetricDisplay();
+                }
+            } catch (error) {
+                console.error('メトリクス選択エラー:', error);
+            }
         }
+
+        function updateCurrentMetricDisplay() {
+            const currentMetricControl = document.getElementById('currentMetricControl');
+            const noMetricMessage = document.getElementById('noMetricMessage');
+            
+            if (currentMetricId) {
+                // 現在のメトリクス情報を取得して表示
+                fetch('/get_current_metrics/')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const currentMetric = data.metrics.find(m => m.metric_id === currentMetricId);
+                            if (currentMetric) {
+                                document.getElementById('metricNameInput').value = currentMetric.original_name;
+                                document.getElementById('prometheusName').textContent = currentMetric.prometheus_name;
+                                document.getElementById('metricSlider').value = currentMetric.value;
+                                document.getElementById('metricValue').textContent = currentMetric.value;
+                                
+                                currentMetricControl.style.display = 'block';
+                                noMetricMessage.style.display = 'none';
+                            }
+                        }
+                    });
+            } else {
+                currentMetricControl.style.display = 'none';
+                noMetricMessage.style.display = 'block';
+            }
+        }
+
+        async function createNewMetric() {
+            const metricName = prompt('新しいメトリクス名を入力してください:', 'new_metric');
+            if (!metricName) return;
+            
+            try {
+                const response = await fetch('/create_metric/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ metric_name: metricName })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentMetricId = data.metric_id;
+                    await loadMetricsList();
+                    updateCurrentMetricDisplay();
+                } else {
+                    alert('メトリクス作成エラー: ' + data.message);
+                }
+            } catch (error) {
+                console.error('メトリクス作成エラー:', error);
+                alert('メトリクス作成エラー');
+            }
+        }
+
+        async function deleteCurrentMetric() {
+            if (!currentMetricId) return;
+            
+            if (!confirm('このメトリクスを削除しますか？')) return;
+            
+            try {
+                const response = await fetch('/delete_metric/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ metric_id: currentMetricId })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentMetricId = data.current_metric_id;
+                    await loadMetricsList();
+                    updateCurrentMetricDisplay();
+                } else {
+                    alert('メトリクス削除エラー: ' + data.message);
+                }
+            } catch (error) {
+                console.error('メトリクス削除エラー:', error);
+                alert('メトリクス削除エラー');
+            }
+        }
+
+        async function clearAllMetrics() {
+            if (!confirm('全てのメトリクスを削除しますか？')) return;
+            
+            try {
+                const response = await fetch('/cleanup_metrics/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    currentMetricId = null;
+                    await loadMetricsList();
+                    updateCurrentMetricDisplay();
+                } else {
+                    alert('メトリクス削除エラー: ' + data.message);
+                }
+            } catch (error) {
+                console.error('メトリクス削除エラー:', error);
+                alert('メトリクス削除エラー');
+            }
+        }
+
+        // メトリクス名の変更を処理
+        document.addEventListener('DOMContentLoaded', function() {
+            let updateTimer = null;
+            
+            document.getElementById('metricNameInput').addEventListener('input', function() {
+                if (isUpdating || !currentMetricId) return;
+                
+                // デバウンス処理：500ms後に更新
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    const metricName = this.value;
+                    updateMetric(metricName, null);
+                }, 500);
+            });
+
+            // スライダーの変更を処理
+            document.getElementById('metricSlider').addEventListener('input', function() {
+                if (isUpdating || !currentMetricId) return;
+                
+                const metricValue = parseFloat(this.value);
+                document.getElementById('metricValue').textContent = metricValue;
+                
+                // デバウンス処理：100ms後に更新
+                clearTimeout(updateTimer);
+                updateTimer = setTimeout(() => {
+                    updateMetric(null, metricValue);
+                }, 100);
+            });
+        });
+
+        async function updateMetric(metricName, metricValue) {
+            if (!currentMetricId) return;
+            
+            try {
+                const requestData = { metric_id: currentMetricId };
+                if (metricName !== null) requestData.metric_name = metricName;
+                if (metricValue !== null) requestData.metric_value = metricValue;
+                
+                const response = await fetch('/update_metric/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // Prometheus名を更新
+                    document.getElementById('prometheusName').textContent = data.prometheus_name;
+                    
+                    // WebSocketで他のクライアントに通知
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            type: 'metric_update',
+                            metric_id: currentMetricId,
+                            metric_name: data.original_name,
+                            prometheus_name: data.prometheus_name,
+                            metric_value: data.value
+                        }));
+                    }
+                    
+                    // メトリクス一覧を更新（デバウンス）
+                    clearTimeout(window.updateListTimer);
+                    window.updateListTimer = setTimeout(() => {
+                        loadMetricsList();
+                    }, 200);
+                }
+            } catch (error) {
+                console.error('メトリクス更新エラー:', error);
+            }
+        }
+
+        function updateMetricFromWebSocket(data) {
+            // WebSocketからの更新を処理（無限ループを防ぐ）
+            if (data.metric_id === currentMetricId) {
+                isUpdating = true;
+                
+                document.getElementById('metricNameInput').value = data.metric_name;
+                document.getElementById('prometheusName').textContent = data.prometheus_name;
+                document.getElementById('metricSlider').value = data.metric_value;
+                document.getElementById('metricValue').textContent = data.metric_value;
+                
+                setTimeout(() => {
+                    isUpdating = false;
+                }, 100);
+            }
+            
+            // メトリクス一覧を更新（デバウンス）
+            clearTimeout(window.updateListTimer);
+            window.updateListTimer = setTimeout(() => {
+                loadMetricsList();
+            }, 200);
+        }
+
+        // ページ読み込み時の初期化
+        window.addEventListener('load', function() {
+            connectWebSocket();
+            loadMetricsList();
+        });
     </script>
 </body>
 </html>

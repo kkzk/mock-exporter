@@ -35,14 +35,18 @@ class WebhookConsumer(AsyncWebsocketConsumer):
             
             if message_type == 'metric_update':
                 # スライダー値の更新をグループの他のクライアントに送信
+                metric_id = text_data_json.get('metric_id')
                 metric_name = text_data_json.get('metric_name')
+                prometheus_name = text_data_json.get('prometheus_name')
                 metric_value = text_data_json.get('metric_value')
                 
                 await self.channel_layer.group_send(
                     "metrics_sync",
                     {
                         "type": "metric_sync",
+                        "metric_id": metric_id,
                         "metric_name": metric_name,
+                        "prometheus_name": prometheus_name,
                         "metric_value": metric_value,
                         "sender_channel": self.channel_name
                     }
@@ -67,6 +71,8 @@ class WebhookConsumer(AsyncWebsocketConsumer):
         if event.get('sender_channel') != self.channel_name:
             await self.send(text_data=json.dumps({
                 'type': 'metric_sync',
+                'metric_id': event.get('metric_id'),
                 'metric_name': event['metric_name'],
+                'prometheus_name': event.get('prometheus_name'),
                 'metric_value': event['metric_value']
             }))
