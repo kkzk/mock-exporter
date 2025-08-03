@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Metrics Exporter</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        .form-group { margin: 20px 0; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="text"] { width: 300px; padding: 5px; }
+        input[type="range"] { width: 300px; }
+        .value-display { font-weight: bold; margin-left: 10px; }
+        button { padding: 10px 20px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+    </style>
+</head>
+<body>
+    <h1>Mock Metrics Exporter</h1>
+    
+    <div class="form-group">
+        <label for="metric_name">メトリクス名:</label>
+        <input type="text" id="metric_name" value="custom_application_metric" />
+    </div>
+    
+    <div class="form-group">
+        <label for="metric_value">メトリクス値 (0-100):</label>
+        <input type="range" id="metric_value" min="0" max="100" value="50" />
+        <span class="value-display" id="value_display">50</span>
+    </div>
+    
+    <button onclick="updateMetric()">メトリクス更新</button>
+    
+    <div style="margin-top: 30px;">
+        <p><strong>Prometheusエンドポイント:</strong> <a href="/metrics" target="_blank">/metrics</a></p>
+    </div>
+
+    <script>
+        const slider = document.getElementById('metric_value');
+        const display = document.getElementById('value_display');
+        
+        slider.addEventListener('input', function() {
+            display.textContent = this.value;
+        });
+        
+        function updateMetric() {
+            const metricName = document.getElementById('metric_name').value;
+            const metricValue = document.getElementById('metric_value').value;
+            
+            fetch('/update_metric/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    metric_name: metricName,
+                    metric_value: metricValue
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(`メトリクス "${metricName}" を ${data.value} に更新しました`);
+                } else {
+                    alert('エラー: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('エラーが発生しました: ' + error);
+            });
+        }
+    </script>
+</body>
+</html>
