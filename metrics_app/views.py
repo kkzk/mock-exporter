@@ -3,9 +3,13 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 import json
+from datetime import datetime
 
 # Prometheusメトリクスのインスタンス
 custom_gauge = Gauge('custom_metric_value', 'Custom metric value from web interface')
+
+# webhookメッセージを保存するリスト（実際のプロダクションではデータベースを使用）
+webhook_messages = []
 
 def index(request):
     """メイン画面を表示"""
@@ -32,3 +36,48 @@ def update_metric(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
     
     return JsonResponse({'status': 'error', 'message': 'POST method required'})
+
+@csrf_exempt
+def webhook(request):
+    """webhookエンドポイント - 外部からのメッセージを受信"""
+    if request.method == 'POST':
+        try:
+            # リクエストボディからデータを取得
+            content_type = request.content_type
+            
+            if 'application/json' in content_type:
+                data = json.loads(request.body)
+                message = data.get('message', 'No message provided')
+            else:
+                # プレーンテキストの場合
+                message = request.body.decode('utf-8')
+            
+            # メッセージを保存（タイムスタンプ付き）
+            webhook_message = {
+                'message': message,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'content_type': content_type
+            }
+            webhook_messages.append(webhook_message)
+            
+            # 最新の100件のみ保持
+            if len(webhook_messages) > 100:
+                webhook_messages.pop(0)
+            
+            return JsonResponse({
+                'status': 'success', 
+                'message': 'Webhook received successfully',
+                'received_message': message
+            })
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    
+    return JsonResponse({'status': 'error', 'message': 'POST method required'})
+
+def get_webhook_messages(request):
+    """webhookメッセージを取得するAPI"""
+    return JsonResponse({
+        'status': 'success',
+        'messages': webhook_messages[-20:]  # 最新20件を返す
+    })
