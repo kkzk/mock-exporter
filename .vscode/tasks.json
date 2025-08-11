@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Mock Exporter",
+			"type": "shell",
+			"command": "uv run daphne mock_exporter.asgi:application -p 3003",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
