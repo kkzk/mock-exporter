@@ -2,12 +2,21 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Django Migrate",
+			"type": "shell",
+			"command": "uv run python manage.py migrate",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
 			"label": "Start Mock Exporter",
 			"type": "shell",
 			"command": "uv run daphne mock_exporter.asgi:application -p 3003",
 			"isBackground": true,
 			"problemMatcher": [],
-			"group": "build"
+			"group": "build",
+			"dependsOn": "Django Migrate"
 		}
 	]
 }
