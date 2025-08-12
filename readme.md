@@ -1,12 +1,17 @@
 # Mock Exporter
 
-Prometheusメトリクス用のモックエクスポーターアプリケーション。Django、WebSocket、Prometheusクライアントを使用して、リアルタイムでメトリクスの作成・更新・監視を行うことができます。
+Prometheusメトリクス用のモックエクスポーターアプリケーション。
+リアルタイムでメトリクスの作成・更新を行うことができます。
+
+アラートルールのテストに使えます。
+
+![alt text](demo/demo.gif)
 
 ## 特徴
 
-- **リアルタイムメトリクス管理**: WebSocketを使用したリアルタイムメトリクス同期
 - **動的メトリクス作成**: Webインターフェースからメトリクスを動的に作成・削除
 - **Prometheus互換**: `/metrics`エンドポイントでPrometheusフォーマットのメトリクスを提供
+- **リアルタイム同期**: 複数のブラウザでアクセスした場合にもWebSocketを使用した設定の同期
 - **Webhook受信**: WebSocketを通じてWebhookメッセージをリアルタイム表示
 
 ## 技術スタック
@@ -15,7 +20,6 @@ Prometheusメトリクス用のモックエクスポーターアプリケーシ�
 - **Django Channels**: WebSocketサポート
 - **Prometheus Client**: メトリクス生成
 - **Daphne**: ASGI Webサーバー
-- **Redis**: Channelsバックエンド（オプション）
 
 ## セットアップ
 
@@ -51,7 +55,7 @@ Prometheusフォーマットのメトリクスを取得
 ```
 POST /webhook/
 ```
-WebhookメッセージをWebSocketクライアントにブロードキャスト
+Webhookメッセージをクライアントに送信
 
 例：
 ```powershell
